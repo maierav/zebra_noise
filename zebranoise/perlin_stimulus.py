@@ -212,7 +212,7 @@ class PerlinStimulus:
         for p in self.tmpdir.glob("_frame*.tif"):
             p.unlink()
         self.tmpdir.joinpath("_grey.tif").unlink()
-    def save_video(self, fn, loop=1, filters=[], bitrate=20):
+    def save_video(self, fn, loop=1, filters=[], bitrate=20, codec="mpeg2video", codec_args=[]):
         """Save the filtered stimulus.
 
         Parameters
@@ -229,6 +229,10 @@ class PerlinStimulus:
             The bitrate in megabits per second.  The default is good for binary
             videos and pure noise, but a higher value may be necessary if
             using the "wood" filter.
+        codec : str
+            The name of the codec to use in ffmpeg
+        codec_args : list of str
+            Additional command line arguments to pass to ffmpeg when rendering
         """
         if Path(fn).exists():
             raise IOError("Output video file already exists!")
@@ -260,8 +264,6 @@ class PerlinStimulus:
         for j in range(1, loop):
             for i in range(0, n_frames):
                 os.link(self.tmpdir.joinpath(f"_frame{i:05}.tif"), self.tmpdir.joinpath(f"_frame{(i+j*n_frames):05}.tif"))
-        if fn[-4:] != ".mp4":
-            fn += ".mp4"
-        call([get_ffmpeg_exe(), "-r", str(self.fps), "-i", str(self.tmpdir.joinpath("_frame%5d.tif")), "-c:v", "mpeg2video", "-an", "-b:v", f"{bitrate}M", fn])
+        call([get_ffmpeg_exe(), "-r", str(self.fps), "-i", str(self.tmpdir.joinpath("_frame%5d.tif")), "-c:v", codec, "-an", "-b:v", f"{bitrate}M"] + codec_args +[fn])
         for p in self.tmpdir.glob("_frame*.tif"):
             p.unlink()
