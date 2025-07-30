@@ -20,41 +20,27 @@ const float GRAD3[][3] = {
 	{0,1,1},{0,-1,1},{0,1,-1},{0,-1,-1},
 	{1,0,-1},{-1,0,-1},{0,-1,1},{0,1,1}};
 
-// At the possible cost of unaligned access, we use char instead of
-// int here to try to ensure that this table fits in L1 cache
-const unsigned char PERM[] = {
-  151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140,
-  36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120,
-  234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
-  88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71,
-  134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133,
-  230, 220, 105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161,
-  1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130,
-  116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250,
-  124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227,
-  47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44,
-  154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98,
-  108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228, 251, 34,
-  242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14,
-  239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121,
-  50, 45, 127, 4, 150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243,
-  141, 128, 195, 78, 66, 215, 61, 156, 180, 151, 160, 137, 91, 90, 15, 131,
-  13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37,
-  240, 21, 10, 23, 190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252,
-  219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125,
-  136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166, 77, 146, 158,
-  231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245,
-  40, 244, 102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187,
-  208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86, 164, 100, 109, 198,
-  173, 186, 3, 64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118, 126,
-  255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42, 223,
-  183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167,
-  43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185,
-  112, 104, 218, 246, 97, 228, 251, 34, 242, 193, 238, 210, 144, 12, 191, 179,
-  162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199,
-  106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254, 138, 236,
-  205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156,
-  180};
+
+#define PERM_SIZE 4096
+#define PERM_MASK (PERM_SIZE-1)
+static unsigned short PERM[PERM_SIZE * 2];
+
+static void init_perm(unsigned int seed)
+{
+    for (unsigned int i = 0; i < PERM_SIZE; ++i) PERM[i] = i;
+    // Fisher-Yates shuffle
+    srand(seed);
+    for (unsigned int i = PERM_SIZE-1; i; --i) {
+        unsigned int j = rand() & PERM_MASK;
+        unsigned short t = PERM[i];
+        PERM[i] = PERM[j];
+        PERM[j] = t;
+    }
+    // duplicate so PERM[i + PERM_SIZE] is always valid
+    for (unsigned int i = 0; i < PERM_SIZE; ++i)
+        PERM[PERM_SIZE + i] = PERM[i];
+}
+
 
 
 static inline float
@@ -76,12 +62,12 @@ noise3(float x, float y, float z, const int repeatx, const int repeaty, const in
 	int ii = (i + 1) %  repeatx;
 	int jj = (j + 1) % repeaty;
 	int kk = (k + 1) % repeatz;
-	i = ((i + base) & 255);
-	j = ((j + base) & 255);
-	k = ((k + base) & 255);
-	ii = ((ii + base) & 255);
-	jj = ((jj + base) & 255);
-	kk = ((kk + base) & 255);
+	i = ((i + base) & PERM_MASK);
+	j = ((j + base) & PERM_MASK);
+	k = ((k + base) & PERM_MASK);
+	ii = ((ii + base) & PERM_MASK);
+	jj = ((jj + base) & PERM_MASK);
+	kk = ((kk + base) & PERM_MASK);
 
 	x -= (float)(int)x; y -= (float)(int)y; z -= (float)(int)z;
 	fx = x*x*x * (x * (x * 6 - 15) + 10);
@@ -89,11 +75,11 @@ noise3(float x, float y, float z, const int repeatx, const int repeaty, const in
 	fz = z*z*z * (z * (z * 6 - 15) + 10);
 
 	A = PERM[i];
-	AA = PERM[A + j];
-	AB = PERM[A + jj];
+	AA = PERM[(A + j) & PERM_MASK];
+	AB = PERM[(A + jj) & PERM_MASK];
 	B = PERM[ii];
-	BA = PERM[B + j];
-	BB = PERM[B + jj];
+	BA = PERM[(B + j) & PERM_MASK];
+	BB = PERM[(B + jj) & PERM_MASK];
 
 	return lerp(fz, lerp(fy, lerp(fx, grad3(PERM[AA + k], x, y, z),
 									  grad3(PERM[BA + k], x - 1, y, z)),
@@ -127,8 +113,8 @@ make_perlin(PyObject *self, PyObject *args, PyObject *kwargs)
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|iffiiii:noise3", kwlist,
 		&__x, &__y, &__z, &octaves, &persistence, &lacunarity, &repeatx, &repeaty, &repeatz, &base))
 		return NULL;
-  if (base < 0 || base > 255) {
-    PyErr_SetString(PyExc_ValueError, "Base must be between 0 and 255");
+  if (base < 0 || base >= PERM_SIZE) {
+    PyErr_SetString(PyExc_ValueError, "Base must be between 0 and 4096");
     return NULL;
   }
   _x = (PyArrayObject*)PyArray_FROMANY(__x, NPY_FLOAT, 1, 1, NPY_ARRAY_C_CONTIGUOUS);
@@ -235,5 +221,6 @@ PyObject *
 PyInit__perlin(void)
 {
   import_array();
+  init_perm(0);
   return PyModule_Create(&moduledef);
 }

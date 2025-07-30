@@ -137,6 +137,8 @@ def generate_frames(xsize, ysize, tsize, timepoints, levels=10, xyscale=.5, tsca
     # Use the temporal scale and number of timepoints to compute how many
     # units to make the stimulus across the temporal dimension
     tunits = int(tsize/(tscale*(fps/30)))
+    if tunits >= 4096:
+        raise ValueError("Too many time points.  Either make the tscale larger or tsize smaller")
     ts_all = np.arange(0, tsize, dtype="float32")/(tscale*(fps/30))
     ratio = int(xsize/ysize*XYSCALEBASE)
     arr = _perlin.make_perlin(np.arange(0, xsize, dtype="float32")/ysize/xscale, # Yes, divide by y size
