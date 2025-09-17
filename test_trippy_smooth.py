@@ -11,44 +11,45 @@ colab_codec_args = ["-pix_fmt", "yuv420p", "-profile:v", "baseline", "-level", "
 # Generate a short test stimulus
 print("Generating regular zebranoise...")
 zebranoise.zebra_noise("test_regular.mp4", 
-                      xsize=320, ysize=256, tdur=5, 
+                      xsize=320, ysize=256, tdur=10, 
                       fps=30, seed=42)
 
-print("Generating trippy-style zebranoise (smooth edges)...")
-stim = zebranoise.PerlinStimulus(xsize=320, ysize=256, tdur=5, 
+print("Creating trippy-style zebranoise stimulus...")
+stim = zebranoise.PerlinStimulus(xsize=320, ysize=256, tdur=10, 
                                 xyscale=0.2, tscale=50, seed=42)
 
-# New trippy_zebra filter: smooth_factor, comb_freq, sigmoid_temp
-stim.save_video("test_trippy_zebra.mp4", 
-               filters=[("trippy_zebra", 4, 0.08, 10)],
+# Ultra-smooth trippy-like filters with extra blurring
+ultra_smooth_filters = [
+    ("temporal_smooth", 21),      # More temporal smoothing
+    ("trippy_zebra_v2", 8, 0.08, 0.03),  # Very smooth spatial + soft edges
+    ("blur", 1.5),                # Extra Gaussian blur
+]
+
+print("Generating trippy-zebra at 100% Michelson contrast...")
+stim.save_video("trippy_zebra_C100.mp4", 
+               filters=ultra_smooth_filters + [("michelson_contrast", 1.0, 0.5)],
                codec="libx264", codec_args=colab_codec_args)
 
-print("Generating very smooth trippy zebra...")
-stim.save_video("test_very_trippy.mp4", 
-               filters=[("trippy_zebra", 8, 0.08, 5)],
+print("Generating trippy-zebra at 33% Michelson contrast...")
+stim.save_video("trippy_zebra_C33.mp4", 
+               filters=ultra_smooth_filters + [("michelson_contrast", 0.33, 0.5)],
                codec="libx264", codec_args=colab_codec_args)
 
-print("Generating ultra-smooth trippy zebra...")
-stim.save_video("test_ultra_trippy.mp4", 
-               filters=[("temporal_smooth", 15), ("trippy_zebra", 6, 0.08, 3)],
+print("Generating trippy-zebra at 5% Michelson contrast...")
+stim.save_video("trippy_zebra_C05.mp4", 
+               filters=ultra_smooth_filters + [("michelson_contrast", 0.05, 0.5)],
                codec="libx264", codec_args=colab_codec_args)
 
-print("Generating tanh-smooth version...")
-stim.save_video("test_tanh_smooth.mp4", 
-               filters=[("trippy_zebra_v2", 4, 0.08, 0.05)],
-               codec="libx264", codec_args=colab_codec_args)
-
-print("Done! All videos should now play in Colab:")
+print("Done! Trippy-style zebranoise with Michelson contrast control:")
 print("- test_regular.mp4: Standard zebranoise (hard edges)")
-print("- test_trippy_zebra.mp4: Trippy-style smooth edges (fixed)")
-print("- test_very_trippy.mp4: Very smooth edges")
-print("- test_ultra_trippy.mp4: Ultra-smooth with temporal smoothing")
-print("- test_tanh_smooth.mp4: Tanh-based ultra-smooth transitions")
+print("- trippy_zebra_C100.mp4: 100% Michelson contrast (full range)")
+print("- trippy_zebra_C33.mp4: 33% Michelson contrast")
+print("- trippy_zebra_C05.mp4: 5% Michelson contrast (subtle)")
 
 # Display the first video as an example
 try:
     from IPython.display import Video, display
-    print("\nDisplaying first video:")
-    display(Video("test_regular.mp4", embed=True, width=640))
+    print("\nDisplaying 33% contrast version:")
+    display(Video("trippy_zebra_C33.mp4", embed=True, width=640))
 except ImportError:
     print("Not in Jupyter/Colab environment - videos saved to files")

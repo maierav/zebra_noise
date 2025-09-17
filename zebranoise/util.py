@@ -204,6 +204,20 @@ def filter_frames(im, filt, *args):
         comb_phase = smoothed / comb_freq
         square_wave = np.sin(2.0 * np.pi * comb_phase)
         return 0.5 * (1.0 + np.tanh(square_wave / edge_width))
+    if filt == "michelson_contrast":
+        # Apply Michelson contrast: (Lmax - Lmin) / (Lmax + Lmin) = C
+        # Output: L + (C * L) * pattern, where pattern is in [-1, 1]
+        contrast = args[0] if len(args) > 0 else 1.0  # C in [0, 1]
+        mean_lum = args[1] if len(args) > 1 else 0.5   # L in [0, 1]
+        
+        # Convert input from [0,1] to [-1,1] pattern
+        pattern = 2.0 * im - 1.0
+        
+        # Apply Michelson contrast formula
+        result = mean_lum + (contrast * mean_lum) * pattern
+        
+        # Clamp to [0, 1]
+        return np.clip(result, 0.0, 1.0)
     if callable(filt):
         return filt(im)
     raise ValueError("Invalid filter specified")
