@@ -170,8 +170,40 @@ def filter_frames(im, filt, *args):
         
         # Apply comb pattern with sigmoid (soft threshold)
         comb_phase = smoothed / comb_freq
-        comb_raw = (comb_phase % 2.0) - 1.0  # Range [-1, 1]
-        return 1.0 / (1.0 + np.exp(-sigmoid_temp * comb_raw))
+        # Create a proper square wave using sine -> sigmoid
+        # This ensures both edges get smoothed equally
+        square_wave = np.sin(2.0 * np.pi * comb_phase)
+        return 1.0 / (1.0 + np.exp(-sigmoid_temp * square_wave))
+    if filt == "trippy_zebra_v2":
+        # Alternative approach: use tanh for even smoother transitions
+        smooth_factor = args[0] if len(args) > 0 else 4
+        comb_freq = args[1] if len(args) > 1 else 0.08
+        edge_width = args[2] if len(args) > 2 else 0.1  # Width of transition zone
+        
+        # First apply spatial smoothing (same as above)
+        h, w, t = im.shape
+        down_h, down_w = max(1, h // smooth_factor), max(1, w // smooth_factor)
+        smoothed = np.zeros_like(im)
+        
+        for i in range(t):
+            frame = im[:,:,i]
+            down_frame = np.zeros((down_h, down_w), dtype=np.float32)
+            for y in range(down_h):
+                for x in range(down_w):
+                    y_start, y_end = y * smooth_factor, min((y+1) * smooth_factor, h)
+                    x_start, x_end = x * smooth_factor, min((x+1) * smooth_factor, w)
+                    down_frame[y,x] = np.mean(frame[y_start:y_end, x_start:x_end])
+            
+            if smooth_factor > 1:
+                up_frame = frozen_upscale(down_frame, smooth_factor)
+                smoothed[:,:,i] = up_frame[:h, :w]
+            else:
+                smoothed[:,:,i] = down_frame
+        
+        # Use tanh for ultra-smooth transitions
+        comb_phase = smoothed / comb_freq
+        square_wave = np.sin(2.0 * np.pi * comb_phase)
+        return 0.5 * (1.0 + np.tanh(square_wave / edge_width))
     if callable(filt):
         return filt(im)
     raise ValueError("Invalid filter specified")
