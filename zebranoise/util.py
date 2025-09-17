@@ -140,6 +140,38 @@ def filter_frames(im, filt, *args):
             for j in range(kernel_len):
                 smoothed[:,:,i] += kernel[j] * padded[:,:,i+j]
         return smoothed
+    if filt == "trippy_zebra":
+        # Trippy-style smooth zebra: smooth first, then soft threshold
+        smooth_factor = args[0] if len(args) > 0 else 4
+        comb_freq = args[1] if len(args) > 1 else 0.08
+        sigmoid_temp = args[2] if len(args) > 2 else 10.0
+        
+        # First apply spatial smoothing
+        h, w, t = im.shape
+        down_h, down_w = max(1, h // smooth_factor), max(1, w // smooth_factor)
+        smoothed = np.zeros_like(im)
+        
+        for i in range(t):
+            frame = im[:,:,i]
+            # Downsample by averaging
+            down_frame = np.zeros((down_h, down_w), dtype=np.float32)
+            for y in range(down_h):
+                for x in range(down_w):
+                    y_start, y_end = y * smooth_factor, min((y+1) * smooth_factor, h)
+                    x_start, x_end = x * smooth_factor, min((x+1) * smooth_factor, w)
+                    down_frame[y,x] = np.mean(frame[y_start:y_end, x_start:x_end])
+            
+            # Upsample with frozen Gaussian
+            if smooth_factor > 1:
+                up_frame = frozen_upscale(down_frame, smooth_factor)
+                smoothed[:,:,i] = up_frame[:h, :w]
+            else:
+                smoothed[:,:,i] = down_frame
+        
+        # Apply comb pattern with sigmoid (soft threshold)
+        comb_phase = smoothed / comb_freq
+        comb_raw = (comb_phase % 2.0) - 1.0  # Range [-1, 1]
+        return 1.0 / (1.0 + np.exp(-sigmoid_temp * comb_raw))
     if callable(filt):
         return filt(im)
     raise ValueError("Invalid filter specified")

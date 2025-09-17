@@ -11,22 +11,24 @@ zebranoise.zebra_noise("test_regular.mp4",
                       xsize=320, ysize=256, tdur=5, 
                       fps=30, seed=42)
 
-print("Generating trippy-smoothed zebranoise...")
+print("Generating trippy-style zebranoise (smooth edges)...")
 stim = zebranoise.PerlinStimulus(xsize=320, ysize=256, tdur=5, 
                                 xyscale=0.2, tscale=50, seed=42)
-stim.save_video("test_trippy_smooth.mp4", 
-               filters=[("trippy_smooth", 4), ("comb", 0.08)])
 
-print("Generating temporally smoothed version...")
-stim.save_video("test_temporal_smooth.mp4", 
-               filters=[("temporal_smooth", 15), ("comb", 0.08)])
+# New trippy_zebra filter: smooth_factor, comb_freq, sigmoid_temp
+stim.save_video("test_trippy_zebra.mp4", 
+               filters=[("trippy_zebra", 4, 0.08, 10)])
 
-print("Generating combined smooth version...")
-stim.save_video("test_combined_smooth.mp4", 
-               filters=[("trippy_smooth", 4), ("temporal_smooth", 11), ("blur", 1), ("comb", 0.08)])
+print("Generating very smooth trippy zebra...")
+stim.save_video("test_very_trippy.mp4", 
+               filters=[("trippy_zebra", 8, 0.08, 5)])
+
+print("Generating ultra-smooth trippy zebra...")
+stim.save_video("test_ultra_trippy.mp4", 
+               filters=[("temporal_smooth", 15), ("trippy_zebra", 6, 0.08, 3)])
 
 print("Done! Compare the videos:")
-print("- test_regular.mp4: Standard zebranoise")
-print("- test_trippy_smooth.mp4: Spatial trippy-style smoothing")
-print("- test_temporal_smooth.mp4: Temporal Hanning smoothing")
-print("- test_combined_smooth.mp4: Combined spatial + temporal smoothing")
+print("- test_regular.mp4: Standard zebranoise (hard edges)")
+print("- test_trippy_zebra.mp4: Trippy-style smooth edges")
+print("- test_very_trippy.mp4: Very smooth edges")
+print("- test_ultra_trippy.mp4: Ultra-smooth with temporal smoothing")
