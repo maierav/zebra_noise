@@ -4,6 +4,42 @@ from . import _perlin
 
 XYSCALEBASE = 100
 
+def gausswin_matlab(L: int, alpha: float) -> np.ndarray:
+    """MATLAB-compatible Gaussian window"""
+    n = np.arange(L, dtype=np.float32)
+    N = float(L - 1) / 2.0 if L > 1 else 1.0
+    x = (n - N) / (N if N != 0 else 1.0)
+    return np.exp(-0.5 * (alpha * x) ** 2).astype(np.float32)
+
+def upsample_1d_along_axis(x: np.ndarray, factor: int, phase: int = 0, axis: int = 0) -> np.ndarray:
+    """MATLAB upsample: result length = len(x) * factor; nonzeros at indices phase, phase+factor, ..."""
+    x = np.asarray(x)
+    assert factor >= 1 and 0 <= phase < factor
+    new_shape = list(x.shape)
+    new_shape[axis] = x.shape[axis] * factor
+    y = np.zeros(new_shape, dtype=x.dtype)
+    sl = [slice(None)] * y.ndim
+    sl[axis] = slice(phase, None, factor)
+    y[tuple(sl)] = x
+    return y
+
+def frozen_upscale(img: np.ndarray, factor: int) -> np.ndarray:
+    """Trippy-style frozen Gaussian upsampler for ultra-smooth interpolation"""
+    out = img.astype(np.float32, copy=True)
+    for _ in range(2):
+        out = out.T
+        ph = int(np.round(factor / 2.0))
+        out = upsample_1d_along_axis(out, factor=factor, phase=ph, axis=0)
+        L = out.shape[0]
+        alpha = (np.sqrt(0.5) * L) / float(factor)
+        k = gausswin_matlab(L, alpha)
+        k = np.fft.ifftshift((factor / np.sum(k)) * k.astype(np.float32))
+        Kf = np.fft.fft(k, n=L).astype(np.complex64)
+        Xf = np.fft.fft(out, axis=0)
+        Yf = Kf[:, None] * Xf
+        out = np.fft.ifft(Yf, axis=0).real.astype(np.float32)
+    return out
+
 def filter_frames(im, filt, *args):
     """Apply a filter/transformation to an image batch
 
@@ -69,6 +105,41 @@ def filter_frames(im, filt, *args):
         im[-s:,:s,::2] = 0
         im[-s:,:s,1::2] = 1
         return im
+    if filt == "trippy_smooth":
+        # Apply trippy-style smoothing with optional downsampling factor
+        factor = args[0] if args else 4
+        h, w, t = im.shape
+        # Downsample first, then upsample with frozen Gaussian
+        down_h, down_w = h // factor, w // factor
+        smoothed = np.zeros_like(im)
+        for i in range(t):
+            # Simple downsampling by averaging blocks
+            frame = im[:,:,i]
+            down_frame = np.zeros((down_h, down_w), dtype=np.float32)
+            for y in range(down_h):
+                for x in range(down_w):
+                    down_frame[y,x] = np.mean(frame[y*factor:(y+1)*factor, x*factor:(x+1)*factor])
+            # Upsample with frozen Gaussian
+            up_frame = frozen_upscale(down_frame, factor)
+            smoothed[:,:,i] = up_frame[:h, :w]
+        return smoothed
+    if filt == "temporal_smooth":
+        # Apply Hanning window smoothing across time (trippy-style)
+        kernel_len = args[0] if args else 11
+        if kernel_len % 2 == 0:
+            kernel_len += 1  # Make odd
+        kernel = np.hanning(kernel_len).astype(np.float32)
+        kernel = kernel / np.sum(kernel)
+        
+        # Pad temporally and convolve
+        pad_width = kernel_len // 2
+        padded = np.pad(im, ((0,0), (0,0), (pad_width, pad_width)), mode='edge')
+        smoothed = np.zeros_like(im)
+        
+        for i in range(im.shape[2]):
+            for j in range(kernel_len):
+                smoothed[:,:,i] += kernel[j] * padded[:,:,i+j]
+        return smoothed
     if callable(filt):
         return filt(im)
     raise ValueError("Invalid filter specified")
