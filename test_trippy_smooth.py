@@ -8,11 +8,11 @@ import zebranoise
 # Generate a short test stimulus
 print("Generating regular zebranoise...")
 zebranoise.zebra_noise("test_regular.mp4", 
-                      xsize=320, ysize=240, tdur=5, 
+                      xsize=320, ysize=256, tdur=5, 
                       fps=30, seed=42)
 
 print("Generating trippy-smoothed zebranoise...")
-stim = zebranoise.PerlinStimulus(xsize=320, ysize=240, tdur=5, 
+stim = zebranoise.PerlinStimulus(xsize=320, ysize=256, tdur=5, 
                                 xyscale=0.2, tscale=50, seed=42)
 stim.save_video("test_trippy_smooth.mp4", 
                filters=[("trippy_smooth", 4), ("comb", 0.08)])
